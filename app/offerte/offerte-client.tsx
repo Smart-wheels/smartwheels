@@ -29,9 +29,20 @@ export function OfferteClient() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
 
+  const MAX_FILES = 5
+  const MAX_TOTAL_BYTES = 20 * 1024 * 1024 // 20 MB totaal
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      const filesArray = Array.from(e.target.files).slice(0, 5)
+      const filesArray = Array.from(e.target.files).slice(0, MAX_FILES)
+      const totalBytes = filesArray.reduce((sum, file) => sum + file.size, 0)
+      if (totalBytes > MAX_TOTAL_BYTES) {
+        setError("De foto's zijn samen te groot (max. 20 MB). Verklein de foto's of stuur er minder mee.")
+        setSelectedFiles([])
+        e.target.value = ''
+        return
+      }
+      setError('')
       setSelectedFiles(filesArray)
     }
   }

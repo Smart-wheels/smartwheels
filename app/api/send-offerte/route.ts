@@ -34,12 +34,36 @@ export async function POST(req: Request) {
       );
     }
 
+    // Limieten voor bijlagen (Resend staat ~40MB per e-mail toe; base64 voegt
+    // ~33% overhead toe, dus we houden ruim marge aan op de ruwe bestandsgrootte).
+    const MAX_FILES = 5;
+    const MAX_TOTAL_BYTES = 20 * 1024 * 1024; // 20 MB totaal
+
     // Bestanden ophalen
     const attachments: Array<{ filename: string; content: Buffer; contentType: string }> = [];
+    let totalBytes = 0;
     for (const entry of formData.entries()) {
       const [key, value] = entry;
       if (key === "photos" && value instanceof File) {
         const buffer = Buffer.from(await value.arrayBuffer());
+        totalBytes += buffer.length;
+
+        if (attachments.length >= MAX_FILES) {
+          return NextResponse.json(
+            { success: false, error: `U kunt maximaal ${MAX_FILES} foto's meesturen.` },
+            { status: 400 }
+          );
+        }
+        if (totalBytes > MAX_TOTAL_BYTES) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: "De foto's zijn samen te groot (max. 20 MB). Verklein de foto's of stuur er minder mee.",
+            },
+            { status: 400 }
+          );
+        }
+
         attachments.push({
           filename: value.name,
           content: buffer,
@@ -134,6 +158,11 @@ export async function POST(req: Request) {
       replyTo: email,
       subject: `Nieuwe offerte aanvraag van ${name}`,
       html: adminEmailHtml,
+      attachments: attachments.map((file) => ({
+        filename: file.filename,
+        content: file.content,
+        contentType: file.contentType,
+      })),
     });
     console.log("Admin email sent successfully");
 
